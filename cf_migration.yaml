@@ -1,0 +1,143 @@
+**AWS Application Migration Service (MGN) Project – Full Write-Up with Explanations**
+
+---
+
+### 🧭 Project Overview
+
+You successfully simulated an on-prem-to-cloud migration using AWS Application Migration Service (MGN), with an Ubuntu source VM in VirtualBox. The project involved installing the AWS Replication Agent, monitoring replication, launching test and cutover instances, and troubleshooting SSH connectivity—all within a free-tier-eligible, controlled environment.
+
+---
+
+### 🖥️ Phase 1: Preparing the Source Server (VirtualBox Ubuntu VM)
+
+1. **Verified OS Type**
+   - Operating System: Ubuntu Linux
+   - Purpose: Identify the compatible AWS Replication Agent version.
+
+2. **Installed Guest Additions (optional)**
+   - Issue: Could not drag and drop the `.pem` file due to missing Guest Additions.
+   - Resolution: Created a shared folder in VirtualBox to copy the PEM key.
+
+3. **Checked Local IP**
+   - Command: `ip a | grep inet`
+   - Purpose: Confirmed network interface and local IP on the Ubuntu VM.
+
+---
+
+### 📦 Phase 2: AWS Application Migration Setup
+
+1. **Source Server Setup in MGN Console**
+   - Added a new source server.
+   - Selected Linux → Replicate all disks.
+
+2. **Generated Installer Command**
+   - Region: `us-east-1`
+   - IAM User Credentials: Provided IAM user access key/secret with **AWSApplicationMigrationAgentInstallationPolicy**.
+
+3. **Downloaded and Installed Replication Agent**
+   - Commands:
+     ```bash
+     wget -O ./aws-replication-installer-init https://aws-application-migration-service-us-east-1.s3.us-east-1.amazonaws.com/latest/linux/aws-replication-installer-init
+     chmod +x aws-replication-installer-init
+     sudo ./aws-replication-installer-init --region us-east-1 --aws-access-key-id <ACCESS_KEY> --aws-secret-access-key <SECRET_KEY>
+     ```
+   - Outcome: AWS Replication Agent successfully registered and identified the volume `/dev/sda`.
+
+4. **Verification**
+   - MGN console reflected: `Data replication status: Healthy`, `Migration lifecycle: Ready for testing`
+
+---
+
+### 🔐 IAM Roles and Policies (IMPORTANT)
+
+To ensure secure operation and agent communication, the following IAM elements were configured:
+
+- **IAM User**: Used during agent installation.
+- **Attached Policy**: `AWSApplicationMigrationAgentInstallationPolicy`
+- **Service-Linked Role**: `AWSServiceRoleForApplicationMigrationService`
+  - **Policy**: `AWSApplicationMigrationServiceRolePolicy`
+
+**Clarification**: This step was initially missing from the write-up but is critical. These managed policies allow:
+- The agent to register the server and perform replication.
+- MGN service to launch test/cutover EC2 instances.
+
+---
+
+### 🚀 Phase 3: Testing and Cutover
+
+1. **Launched Test Instance**
+   - Issue: MGN launched a `c5.large` instance instead of the preferred `t2.micro`.
+   - Troubleshooting:
+     - Multiple launch templates were created.
+     - Only one was set as default.
+     - Others had correct instance type (t2.micro), key pair, and subnet.
+
+2. **Edited Launch Template**
+   - Updated to use:
+     - AMI: Amazon Linux 2 (t2.micro, free tier eligible)
+     - Key pair: `EC2LU`
+     - Auto-assign public IP: Enabled
+     - Security Group: SSH (port 22) open
+
+3. **Re-launched and Monitored**
+   - Replication status: Healthy
+   - Migration lifecycle: `Ready for cutover`
+   - Cutover launched a `t2.micro` instance
+
+---
+
+### 🔐 SSH Access – Troubleshooting and Success
+
+1. **Copied `.pem` to Source VM**
+   - Used VirtualBox shared folder.
+   - Set file permission:
+     ```bash
+     chmod 400 EC2LU.pem
+     ```
+
+2. **Failed Attempts**
+   - Using old instance with `c5.large` and Ubuntu image prompted password
+   - Cause: Username mismatch or incorrect AMI/launch template
+
+3. **Successful SSH Access**
+   - Command:
+     ```bash
+     ssh -i "EC2LU.pem" ec2-user@<Public-IP>
+     ```
+   - OS: Amazon Linux 2
+   - Verified successful login (no password prompt)
+
+---
+
+### 🧹 Cleanup (Avoid Ongoing Charges)
+
+1. **Terminate EC2 Instances** (Test + Cutover)
+2. **Delete Replication Server** (if still running)
+3. **Remove Source Server in MGN Console**
+4. **Delete Launch Templates**
+5. **Delete Shared S3 Files (if used)**
+6. **Detach/Delete IAM Users or Roles** (if project-specific)
+
+---
+
+### ✅ Summary of Skills Demonstrated
+
+- ✅ IAM roles/policies and secure key handling
+- ✅ Linux VM configuration and network verification
+- ✅ AWS MGN replication + cutover workflow
+- ✅ Launch template creation, troubleshooting, and cost optimization
+- ✅ SSH access setup and resolution of permission issues
+
+---
+
+### 📁 Artifacts Created
+
+- Ubuntu Source VM in VirtualBox
+- Shared `.pem` key via mounted folder
+- Multiple AWS EC2 instances from MGN
+- Verified `.ssh` access via Amazon Linux instance
+- Final documented working setup with a `t2.micro` instance
+
+---
+
+Would you like this exported as a PDF or Word doc now?
